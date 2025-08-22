@@ -76,7 +76,7 @@ jobs:
           cd ../$PACKAGE-build
           git fetch --all --tags
           git checkout tags/$NEWEST_VERSION        
-          docker build -t $DOCKER_REGISTRY/$REGISTRY_USER/$PACKAGE:latest -t $DOCKER_REGISTRY/$REGISTRY_USER/$PACKAGE:alpine:$NEWEST_VERSION .
+          docker build -t $DOCKER_REGISTRY/$REGISTRY_USER/$PACKAGE:latest -t $DOCKER_REGISTRY/$REGISTRY_USER/$PACKAGE:$NEWEST_VERSION .
           echo "${{ secrets.DOCKER_PASSWORD }}" | docker login $DOCKER_REGISTRY -u $REGISTRY_USER --password-stdin
           docker push --all-tags $DOCKER_REGISTRY/$REGISTRY_USER/$PACKAGE
 
