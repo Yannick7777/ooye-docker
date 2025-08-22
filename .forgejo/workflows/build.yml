@@ -24,7 +24,7 @@ jobs:
         shell: sh
         run: |
           echo "Run because of ${{ github.event_name }}"
-          apk add --no-cache git nodejs npm bash sed curl jq yq $PACKAGE
+          apk add --no-cache git nodejs npm bash sed curl jq yq
 
       - uses: actions/checkout@v3
 
