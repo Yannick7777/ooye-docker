@@ -17,8 +17,8 @@ jobs:
       COMMIT_AUTHOR_NAME: "forgejo-runner"
       COMMIT_AUTHOR_EMAIL: "forgejo-runner@shork.ch"
       COMMIT_MESSAGE: "Update build metadata"
-      GET_NEWEST_VERSION_CMD: 'curl -s https://gitdab.com/api/v1/repos/cadence/out-of-your-element/releases?limit=1 | \
-          jq ".[0].tag_name"'
+      GET_NEWEST_VERSION_CMD: "curl -s https://gitdab.com/api/v1/repos/cadence/out-of-your-element/releases?limit=1 | \
+          jq .[0].tag_name"
       REBUILD_ALL_X_DAYS: 14
 
     steps:
