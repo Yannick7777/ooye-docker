@@ -1,0 +1,87 @@
+name: Auto Build Docker Container From Alpine PKG
+enable-email-notifications: true
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '12 */3 * * *'
+
+jobs:
+  build:
+    runs-on: dind
+
+    env:
+      PACKAGE: out-of-your-element
+      DOCKER_REGISTRY: git.shork.ch
+      REGISTRY_USER: docker-images
+      COMMIT_AUTHOR_NAME: "forgejo-runner"
+      COMMIT_AUTHOR_EMAIL: "forgejo-runner@shork.ch"
+      COMMIT_MESSAGE: "Update build metadata"
+      REBUILD_ALL_X_DAYS: 14
+
+    steps:
+      - name: Install dependencies
+        shell: sh
+        run: |
+          echo "Run because of ${{ github.event_name }}"
+          apk add --no-cache git nodejs npm bash sed curl jq yq $PACKAGE
+
+      - uses: actions/checkout@v3
+
+      - name: Get latest package version
+        run: |
+          mewest_version=$(curl -s https://gitdab.com/api/v1/repos/cadence/out-of-your-element/releases?limit=1 | \
+          jq ".[0].tag_name")
+          echo "NEWEST_VERSION=$newest_version" >> $GITHUB_ENV
+
+      - name: Determine if update is needed
+        run: |
+          last_version_file=".last_version"
+          last_rebuild_file=".last_rebuild"
+          last_dockerfile_hash_file=".dockerfile_hash"
+
+          last_version=$(cat $last_version_file 2>/dev/null || echo "none")
+          last_rebuild=$(cat $last_rebuild_file 2>/dev/null || echo 0)
+          last_dockerfile_hash=$(cat $last_dockerfile_hash_file 2>/dev/null || echo "none")
+          dockerfile_hash=$(sha256sum Dockerfile | awk '{print $1}' || echo "nuh")
+          current_day=$(( $(date +%s) / 86400 ))
+
+          update="false"
+          if [ ${{ github.event_name }} == "workflow_dispatch" ] || [ "$last_version" != "$NEWEST_VERSION" ] || [ "$last_dockerfile_hash" != "$dockerfile_hash" ] || [ $((current_day - last_rebuild)) -gt "$REBUILD_ALL_X_DAYS" ]; then
+            update="true"
+          fi
+
+          echo "UPDATE=$update" >> $GITHUB_ENV
+          echo "DOCKERFILE_HASH=$dockerfile_hash" >> $GITHUB_ENV
+
+      - name: Start Docker daemon
+        if: env.UPDATE == 'true'
+        run: |
+          dockerd-entrypoint.sh &
+          for i in {1..10}; do
+            docker info && break
+            echo "Waiting for Docker daemon..."
+          
+          done
+          docker info || { echo "Docker daemon failed to start."; exit 1; }
+
+      - name: Build and push Docker image
+        if: env.UPDATE == 'true'
+        run: |
+          docker build -t $DOCKER_REGISTRY/$REGISTRY_USER/$PACKAGE:latest -t $DOCKER_REGISTRY/$REGISTRY_USER/$PACKAGE:alpine:$NEWEST_VERSION .
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login $DOCKER_REGISTRY -u $REGISTRY_USER --password-stdin
+          docker push --all-tags $DOCKER_REGISTRY/$REGISTRY_USER/$PACKAGE
+          echo "$NEWEST_VERSION" > .last_version
+          echo $(( $(date +%s) / 86400 )) > .last_rebuild
+          echo "$DOCKERFILE_HASH" > .dockerfile_hash
+
+      - name: Commit updated metadata
+        if: env.UPDATE == 'true'
+        run: |
+          git config user.name "$COMMIT_AUTHOR_NAME"
+          git config user.email "$COMMIT_AUTHOR_EMAIL"
+          git add .last_version .last_rebuild .dockerfile_hash
+          git commit -m "$COMMIT_MESSAGE" || echo "No commit"
+          git push
+
+
