@@ -17,6 +17,8 @@ jobs:
       COMMIT_AUTHOR_NAME: "forgejo-runner"
       COMMIT_AUTHOR_EMAIL: "forgejo-runner@shork.ch"
       COMMIT_MESSAGE: "Update build metadata"
+      GET_NEWEST_VERSION_CMD: "curl -s https://gitdab.com/api/v1/repos/cadence/out-of-your-element/releases?limit=1 | \
+          jq ".[0].tag_name"
       REBUILD_ALL_X_DAYS: 14
 
     steps:
@@ -29,9 +31,9 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Get latest package version
+        id: check
         run: |
-          mewest_version=$(curl -s https://gitdab.com/api/v1/repos/cadence/out-of-your-element/releases?limit=1 | \
-          jq ".[0].tag_name")
+          newest_version=$(eval "$GET_NEWEST_VERSION_CMD")
           echo "NEWEST_VERSION=$newest_version" >> $GITHUB_ENV
 
       - name: Determine if update is needed
@@ -68,16 +70,21 @@ jobs:
       - name: Build and push Docker image
         if: env.UPDATE == 'true'
         run: |
+          git clone $GIT_REPO_URL ../$PACKAGE-build
+          cp Dockerfile ../$PACKAGE-build
+          cd ../$PACKAGE-build
+          git fetch --all --tags
+          git checkout tags/$NEWEST_VERSION        
           docker build -t $DOCKER_REGISTRY/$REGISTRY_USER/$PACKAGE:latest -t $DOCKER_REGISTRY/$REGISTRY_USER/$PACKAGE:alpine:$NEWEST_VERSION .
           echo "${{ secrets.DOCKER_PASSWORD }}" | docker login $DOCKER_REGISTRY -u $REGISTRY_USER --password-stdin
           docker push --all-tags $DOCKER_REGISTRY/$REGISTRY_USER/$PACKAGE
-          echo "$NEWEST_VERSION" > .last_version
-          echo $(( $(date +%s) / 86400 )) > .last_rebuild
-          echo "$DOCKERFILE_HASH" > .dockerfile_hash
 
       - name: Commit updated metadata
         if: env.UPDATE == 'true'
         run: |
+          echo "$NEWEST_VERSION" > .last_version
+          echo $(( $(date +%s) / 86400 )) > .last_rebuild
+          echo "$DOCKERFILE_HASH" > .dockerfile_hash
           git config user.name "$COMMIT_AUTHOR_NAME"
           git config user.email "$COMMIT_AUTHOR_EMAIL"
           git add .last_version .last_rebuild .dockerfile_hash
