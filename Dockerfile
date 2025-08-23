@@ -14,4 +14,4 @@ COPY --chown=node:node --from=builder /usr/src/app .
 RUN chown node:node /usr/src/app
 
 USER node
-CMD ["node", "run", "start"]
+CMD ["npm", "run", "start"]
