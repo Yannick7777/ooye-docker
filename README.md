@@ -9,4 +9,4 @@ This repo contains buildscripts and instructions to setup and run ooye inside a 
 - Run `docker compose up -d` to start the container in the background
 - You now got 30 mins time to setup the container
 - Run `docker compose exec ooye npm run setup` to start the interactive setup process
-- After the setup is complete, remove or comment out the command line inside the `compose.yaml` file again
+- After setup is complete, remove or comment out the command line inside the `compose.yaml` file again and restarting the container by running `docker compose down && docker compose up -d`
